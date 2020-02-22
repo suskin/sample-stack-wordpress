@@ -1,0 +1,46 @@
+pipeline {
+    agent { label 'upbound-gce' }
+
+    parameters {
+        string(name: 'imageRepository', defaultValue: '', description: '')
+        string(name: 'imageSourceTag', defaultValue: '', description: '')
+        string(name: 'imageDestinationTag', defaultValue: '', description: '')
+    }
+
+    options {
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    environment {
+        DOCKER = credentials('dockerhub-upboundci')
+    }
+
+    stages {
+        stage('Validate parameters') {
+            steps {
+                sh """test -n '${params.imageRepository}' || ( echo 'ERROR: All parameters are required!' && exit 1 )
+                      test -n '${params.imageSourceTag}' || ( echo 'ERROR: All parameters are required!' && exit 1 )
+                      test -n '${params.imageDestinationTag}' || ( echo 'ERROR: All parameters are required!' && exit 1 )
+                """
+            }
+        }
+        stage('Promote Release') {
+
+            steps {
+                sh """docker pull ${params.imageRepository}:${params.imageSourceTag}
+                      docker tag ${params.imageRepository}:${params.imageSourceTag} ${params.imageRepository}:${params.imageSourceTag}
+                      docker push ${params.imageRepository}:${params.imageDestinationTag}
+                """
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                deleteDir()
+            }
+        }
+    }
+}
